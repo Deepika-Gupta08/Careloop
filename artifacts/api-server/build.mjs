@@ -3,7 +3,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build as esbuild } from "esbuild";
 import esbuildPluginPino from "esbuild-plugin-pino";
-import { rm } from "node:fs/promises";
+import { copyFile, rm } from "node:fs/promises";
+import { existsSync } from "node:fs";
 
 // Plugins (e.g. 'esbuild-plugin-pino') may use `require` to resolve dependencies
 globalThis.require = createRequire(import.meta.url);
@@ -118,6 +119,20 @@ globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
     `,
     },
   });
+
+  const dbPkgRequire = createRequire(path.resolve(artifactDir, "../../lib/db/package.json"));
+  try {
+    const pgliteEntry = dbPkgRequire.resolve("@electric-sql/pglite");
+    const pgliteDist = path.dirname(pgliteEntry);
+    for (const file of ["postgres.data", "postgres.wasm"]) {
+      const src = path.join(pgliteDist, file);
+      if (existsSync(src)) {
+        await copyFile(src, path.join(distDir, file));
+      }
+    }
+  } catch (e) {
+    console.warn("Could not copy pglite assets:", e);
+  }
 }
 
 buildAll().catch((err) => {

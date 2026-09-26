@@ -3,13 +3,21 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Health Management System API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Session authentication
+  - name: patient
+    description: Patient workflows
+  - name: doctor
+    description: Doctor workflows
+  - name: admin
+    description: Administrator workflows
 paths:
   /healthz:
     get:
@@ -24,7 +32,364 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /auth/me:
+    get:
+      operationId: getCurrentUser
+      tags: [auth]
+      summary: Get the current session user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionUser"
+        "401":
+          description: Not authenticated
+  /auth/register:
+    post:
+      operationId: registerPatient
+      tags: [auth]
+      summary: Register a patient account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatientRegistration"
+      responses:
+        "201":
+          description: Registered patient
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionUser"
+        "400":
+          description: Invalid registration
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Log in to an existing account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Logged-in user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionUser"
+        "401":
+          description: Invalid credentials
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: End the current session
+      responses:
+        "204":
+          description: Logged out
+  /patient/dashboard:
+    get:
+      operationId: getPatientDashboard
+      tags: [patient]
+      summary: Get patient dashboard data
+      responses:
+        "200":
+          description: Patient dashboard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatientDashboard"
+        "401":
+          description: Not authenticated
+  /doctors:
+    get:
+      operationId: listDoctors
+      tags: [patient]
+      summary: List active doctors
+      parameters:
+        - $ref: "#/components/parameters/Search"
+        - $ref: "#/components/parameters/Specialization"
+      responses:
+        "200":
+          description: Active doctors
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Doctor"
+  /patient/appointments:
+    get:
+      operationId: listPatientAppointments
+      tags: [patient]
+      summary: List the current patient's appointments
+      responses:
+        "200":
+          description: Patient appointments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Appointment"
+    post:
+      operationId: createAppointment
+      tags: [patient]
+      summary: Book an appointment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AppointmentInput"
+      responses:
+        "201":
+          description: Appointment created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Appointment"
+        "400":
+          description: Scheduling validation error
+  /patient/appointments/{id}/cancel:
+    post:
+      operationId: cancelPatientAppointment
+      tags: [patient]
+      summary: Cancel an eligible patient appointment
+      parameters:
+        - $ref: "#/components/parameters/AppointmentId"
+      responses:
+        "200":
+          description: Cancelled appointment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Appointment"
+        "404":
+          description: Appointment not found
+  /doctor/dashboard:
+    get:
+      operationId: getDoctorDashboard
+      tags: [doctor]
+      summary: Get doctor dashboard data
+      responses:
+        "200":
+          description: Doctor dashboard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DoctorDashboard"
+  /doctor/appointments:
+    get:
+      operationId: listDoctorAppointments
+      tags: [doctor]
+      summary: List appointments assigned to the current doctor
+      parameters:
+        - $ref: "#/components/parameters/Date"
+      responses:
+        "200":
+          description: Doctor appointments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Appointment"
+  /doctor/appointments/{id}/status:
+    patch:
+      operationId: updateAppointmentStatus
+      tags: [doctor]
+      summary: Update an assigned appointment status
+      parameters:
+        - $ref: "#/components/parameters/AppointmentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AppointmentStatusInput"
+      responses:
+        "200":
+          description: Updated appointment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Appointment"
+        "403":
+          description: Appointment is not assigned to this doctor
+  /admin/dashboard:
+    get:
+      operationId: getAdminDashboard
+      tags: [admin]
+      summary: Get system metrics
+      responses:
+        "200":
+          description: Admin dashboard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminDashboard"
+  /admin/doctors:
+    get:
+      operationId: listAllDoctors
+      tags: [admin]
+      summary: List all doctors
+      responses:
+        "200":
+          description: All doctors
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Doctor"
+    post:
+      operationId: createDoctor
+      tags: [admin]
+      summary: Create a doctor account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DoctorInput"
+      responses:
+        "201":
+          description: Created doctor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Doctor"
+        "400":
+          description: Invalid doctor
+  /admin/doctors/{id}:
+    patch:
+      operationId: updateDoctor
+      tags: [admin]
+      summary: Edit a doctor
+      parameters:
+        - $ref: "#/components/parameters/DoctorId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DoctorUpdate"
+      responses:
+        "200":
+          description: Updated doctor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Doctor"
+  /admin/doctors/{id}/active:
+    patch:
+      operationId: toggleDoctorActive
+      tags: [admin]
+      summary: Activate or deactivate a doctor
+      parameters:
+        - $ref: "#/components/parameters/DoctorId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActiveInput"
+      responses:
+        "200":
+          description: Updated doctor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Doctor"
+  /admin/patients:
+    get:
+      operationId: listPatients
+      tags: [admin]
+      summary: List patients
+      parameters:
+        - $ref: "#/components/parameters/Search"
+      responses:
+        "200":
+          description: Patients
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Patient"
+  /admin/appointments:
+    get:
+      operationId: listAllAppointments
+      tags: [admin]
+      summary: List and filter every appointment
+      parameters:
+        - $ref: "#/components/parameters/Search"
+        - $ref: "#/components/parameters/Date"
+        - $ref: "#/components/parameters/Status"
+        - $ref: 
+            "#/components/parameters/DoctorIdQuery"
+      responses:
+        "200":
+          description: All appointments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Appointment"
 components:
+  parameters:
+    Search:
+      name: search
+      in: query
+      required: false
+      schema:
+        type: string
+    Specialization:
+      name: specialization
+      in: query
+      required: false
+      schema:
+        type: string
+    Date:
+      name: date
+      in: query
+      required: false
+      schema:
+        type: string
+        format: date
+    Status:
+      name: status
+      in: query
+      required: false
+      schema:
+        $ref: "#/components/schemas/AppointmentStatus"
+    AppointmentId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+    DoctorId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+    DoctorIdQuery:
+      name: doctorId
+      in: query
+      required: false
+      schema:
+        type: integer
   schemas:
     HealthStatus:
       type: object
@@ -33,4 +398,144 @@ components:
           type: string
       required:
         - status
+    Role:
+      type: string
+      enum: [Admin, Doctor, Patient]
+    AppointmentStatus:
+      type: string
+      enum: [Pending, Confirmed, Completed, Cancelled]
+    SessionUser:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        email: { type: string, format: email }
+        role: { $ref: "#/components/schemas/Role" }
+        specialization: { type: ["string", "null"] }
+      required: [id, name, email, role, specialization]
+    PatientRegistration:
+      type: object
+      properties:
+        name: { type: string, minLength: 2 }
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
+        confirmPassword: { type: string, minLength: 8 }
+      required: [name, email, password, confirmPassword]
+    LoginInput:
+      type: object
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 1 }
+      required: [email, password]
+    Doctor:
+      type: object
+      properties:
+        id: { type: integer }
+        userId: { type: integer }
+        name: { type: string }
+        email: { type: string, format: email }
+        specialization: { type: string }
+        availableDays:
+          type: array
+          items: { type: string }
+        isActive: { type: boolean }
+      required: [id, userId, name, email, specialization, availableDays, isActive]
+    DoctorInput:
+      type: object
+      properties:
+        name: { type: string, minLength: 2 }
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
+        specialization: { type: string, minLength: 2 }
+        availableDays:
+          type: array
+          items: { type: string }
+          minItems: 1
+      required: [name, email, password, specialization, availableDays]
+    DoctorUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 2 }
+        specialization: { type: string, minLength: 2 }
+        availableDays:
+          type: array
+          items: { type: string }
+          minItems: 1
+      required: [name, specialization, availableDays]
+    ActiveInput:
+      type: object
+      properties:
+        isActive: { type: boolean }
+      required: [isActive]
+    Appointment:
+      type: object
+      properties:
+        id: { type: integer }
+        patientId: { type: integer }
+        patientName: { type: string }
+        patientEmail: { type: string }
+        doctorId: { type: integer }
+        doctorName: { type: string }
+        specialization: { type: string }
+        date: { type: string, format: date }
+        time: { type: string }
+        status: { $ref: "#/components/schemas/AppointmentStatus" }
+      required: [id, patientId, patientName, patientEmail, doctorId, doctorName, specialization, date, time, status]
+    AppointmentInput:
+      type: object
+      properties:
+        doctorId: { type: integer }
+        date: { type: string, format: date }
+        time: { type: string, pattern: "^[0-2][0-9]:[0-5][0-9]$" }
+      required: [doctorId, date, time]
+    AppointmentStatusInput:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [Confirmed, Completed, Cancelled]
+      required: [status]
+    Patient:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        email: { type: string, format: email }
+        createdAt: { type: string }
+        isActive: { type: boolean }
+      required: [id, name, email, createdAt, isActive]
+    PatientDashboard:
+      type: object
+      properties:
+        user: { $ref: "#/components/schemas/SessionUser" }
+        upcomingCount: { type: integer }
+        nextAppointment:
+          anyOf:
+            - { $ref: "#/components/schemas/Appointment" }
+            - { type: "null" }
+        recentAppointments:
+          type: array
+          items: { $ref: "#/components/schemas/Appointment" }
+      required: [user, upcomingCount, nextAppointment, recentAppointments]
+    DoctorDashboard:
+      type: object
+      properties:
+        doctor: { $ref: "#/components/schemas/Doctor" }
+        todayCount: { type: integer }
+        upcomingCount: { type: integer }
+        todayAppointments:
+          type: array
+          items: { $ref: "#/components/schemas/Appointment" }
+      required: [doctor, todayCount, upcomingCount, todayAppointments]
+    AdminDashboard:
+      type: object
+      properties:
+        patients: { type: integer }
+        doctors: { type: integer }
+        appointments: { type: integer }
+        pending: { type: integer }
+        confirmed: { type: integer }
+        completed: { type: integer }
+        cancelled: { type: integer }
+      required: [patients, doctors, appointments, pending, confirmed, completed, cancelled]
 

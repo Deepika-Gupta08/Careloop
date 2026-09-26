@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "hello": "tsx ./src/hello.ts",
+    "hms-smoke": "tsx ./src/hms-smoke.ts",
+    "hms-test": "tsx ./src/hms-test-suite.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {

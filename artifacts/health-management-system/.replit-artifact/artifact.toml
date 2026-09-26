@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Health Management System"
+description = "A polished clinic administration and appointment management system for patients, doctors, and administrators, with secure role-based workflows and persistent scheduling data."
+version = "1.0.0"
+id = "artifacts/health-management-system"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22348
+
+[services.development]
+run = "pnpm --filter @workspace/health-management-system run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/health-management-system", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/health-management-system/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22348"
+BASE_PATH = "/"
