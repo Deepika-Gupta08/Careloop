@@ -23,11 +23,12 @@ services:
     branch: main
 
     # ── Build ──────────────────────────────────────────────────────────────────
-    # pnpm is not pre-installed on Render; we enable it via corepack which ships
-    # with Node.js >= 16. The preinstall script in package.json guards against
-    # npm, so we must ensure pnpm is used for all install/build steps.
+    # Render's container filesystem has read-only system paths (/usr/bin, /usr/lib),
+    # so 'npm i -g pnpm' or bare 'corepack enable' fail with EROFS.
+    # We activate pnpm via Corepack into a writable user directory (~/.local/bin)
+    # matching the pinned packageManager in package.json (pnpm@10.5.2).
     buildCommand: |
-      npm install -g pnpm@latest && pnpm install --frozen-lockfile && pnpm run build
+      export COREPACK_ENABLE_DOWNLOAD_PROMPT=0 && mkdir -p ~/.local/bin && corepack enable pnpm --install-directory ~/.local/bin && export PATH="$HOME/.local/bin:$PATH" && corepack install && pnpm install --frozen-lockfile && pnpm run build
 
     # ── Start ─────────────────────────────────────────────────────────────────
     # Runs the pre-built ESM bundle. PORT is automatically injected by Render.
@@ -45,6 +46,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: COREPACK_ENABLE_DOWNLOAD_PROMPT
+        value: "0"
       - key: DATABASE_URL
         fromDatabase:
           name: careloop-hms-db
