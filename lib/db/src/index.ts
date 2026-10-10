@@ -59,8 +59,10 @@ CREATE TABLE IF NOT EXISTS hms_appointments (
 let rawPool: DbPool;
 
 const dbUrl = process.env.DATABASE_URL?.trim();
+const isProduction = process.env.NODE_ENV === "production";
 
 if (dbUrl && (dbUrl.startsWith("postgres://") || dbUrl.startsWith("postgresql://"))) {
+  // ── Production PostgreSQL (Render, Supabase, Neon, Railway, etc.) ──────────
   const isLocalhost = dbUrl.includes("localhost") || dbUrl.includes("127.0.0.1");
   const poolConfig: pg.PoolConfig = { connectionString: dbUrl };
   if (!isLocalhost && !dbUrl.includes("sslmode=disable")) {
@@ -91,14 +93,45 @@ if (dbUrl && (dbUrl.startsWith("postgres://") || dbUrl.startsWith("postgresql://
       };
     },
   };
+} else if (isProduction) {
+  // ── Production without DATABASE_URL: fail fast ────────────────────────────
+  // Loading the PGlite WASM engine (~50–100 MiB RSS) on a 512 MiB host causes
+  // an out-of-memory crash. In production the DATABASE_URL env var is required.
+  console.error(
+    "[DB] FATAL: DATABASE_URL is not set and NODE_ENV=production.\n" +
+      "       Set DATABASE_URL to a PostgreSQL connection string in your Render\n" +
+      "       dashboard environment variables, or provision a Render PostgreSQL\n" +
+      "       database and link it to this service via the render.yaml blueprint.\n" +
+      "       Embedded PGlite is not supported in production due to memory limits.",
+  );
+  process.exit(1);
 } else {
+  // ── Development / Test: embedded PGlite ───────────────────────────────────
+  console.warn(
+    "[DB] DATABASE_URL not set — using embedded PGlite for local development.\n" +
+      "       Do NOT use this mode in production (set DATABASE_URL instead).",
+  );
+
   const rootDir = process.cwd();
+
+  // Prefer ./data/hms_db; fall back to Health-Management-System/ prefix path;
+  // last resort: /tmp/hms_db (writable on most systems including Render FS).
   let dataDir = path.resolve(rootDir, "data/hms_db");
   if (!fs.existsSync(dataDir) && fs.existsSync(path.resolve(rootDir, "Health-Management-System/data/hms_db"))) {
     dataDir = path.resolve(rootDir, "Health-Management-System/data/hms_db");
   }
   if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
+    try {
+      fs.mkdirSync(dataDir, { recursive: true });
+    } catch {
+      // If we cannot create the preferred path (e.g. read-only filesystem),
+      // fall back to the system temp directory.
+      dataDir = path.resolve(
+        process.env.TMPDIR || process.env.TEMP || "/tmp",
+        "hms_db",
+      );
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
   }
 
   const pglite = new PGlite(dataDir);
@@ -143,7 +176,7 @@ let initPromise: Promise<void> | null = null;
 export async function initDatabase(): Promise<void> {
   if (!initPromise) {
     initPromise = (async () => {
-      // Execute each statement in INIT_DDL
+      // Execute each statement in INIT_DDL — idempotent, safe to run on every restart
       const statements = INIT_DDL.split(";")
         .map((s) => s.trim())
         .filter(Boolean);

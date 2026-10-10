@@ -1,0 +1,60 @@
+# render.yaml — Render Infrastructure-as-Code
+# Defines the Careloop HMS web service and PostgreSQL database.
+#
+# How to use:
+#   1. Push this file to your GitHub repository (origin/main).
+#   2. In the Render dashboard, create a new "Blueprint" and connect this repo.
+#   3. Render will automatically provision the PostgreSQL database and web service.
+#   4. The DATABASE_URL environment variable is injected automatically from the
+#      database instance — no manual copying is required.
+#
+# Manual Render dashboard actions still required after blueprint deployment:
+#   - Confirm the PostgreSQL plan (free tier is fine for development).
+#   - Confirm the web service plan (free tier causes cold starts; use Starter+ for
+#     production to avoid the 512 MiB memory limit).
+#   - Verify the health-check passes at /health after the first deploy.
+
+services:
+  - type: web
+    name: careloop-hms
+    runtime: node
+    region: oregon    # Change to match your preferred region
+    plan: starter     # Use "starter" (512 MiB) or higher; "free" has cold starts
+    branch: main
+
+    # ── Build ──────────────────────────────────────────────────────────────────
+    # pnpm is not pre-installed on Render; we enable it via corepack which ships
+    # with Node.js >= 16. The preinstall script in package.json guards against
+    # npm, so we must ensure pnpm is used for all install/build steps.
+    buildCommand: |
+      npm install -g pnpm@latest && pnpm install --frozen-lockfile && pnpm run build
+
+    # ── Start ─────────────────────────────────────────────────────────────────
+    # Runs the pre-built ESM bundle. PORT is automatically injected by Render.
+    # NODE_OPTIONS caps V8 heap at 400 MiB, leaving headroom for native allocations
+    # within the 512 MiB container limit.
+    startCommand: node --max-old-space-size=400 artifacts/api-server/dist/index.mjs
+
+    # ── Health Check ──────────────────────────────────────────────────────────
+    healthCheckPath: /health
+
+    # ── Environment Variables ─────────────────────────────────────────────────
+    # PORT is injected automatically by Render — do not set it manually.
+    # DATABASE_URL is injected automatically from the database block below via
+    # the "fromDatabase" reference — do not set it manually.
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: careloop-hms-db
+          property: connectionString
+      - key: NODE_OPTIONS
+        value: "--max-old-space-size=400"
+
+databases:
+  - name: careloop-hms-db
+    databaseName: hms_db
+    user: hms_user
+    plan: free          # Render Free PostgreSQL (90-day limit); upgrade for production
+    region: oregon      # Must match the web service region

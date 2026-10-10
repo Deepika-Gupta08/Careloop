@@ -742,7 +742,7 @@ export async function ensureDemoData() {
     await pool.query(
       `INSERT INTO hms_doctors (user_id, specialization, available_days)
        VALUES ($1, $2, $3)
-       ON CONFLICT DO NOTHING`,
+       ON CONFLICT (user_id) DO NOTHING`,
       [user.rows[0].id, specialization, availableDays],
     );
   }
